@@ -43,6 +43,12 @@
                 "description": "Enter only one option per entry. See project page for the complete list of available options.",
                 "placeholder": "e.g. Disable.uuid"
             }
+        },
+        "timeout": {
+            "title": "Device timeout (seconds)",
+            "type": "number",
+            "default": 5000,
+            "required": true
         }
     }
   }
