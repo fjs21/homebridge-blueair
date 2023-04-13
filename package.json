@@ -1,7 +1,7 @@
 {
   "name": "@fjs21/homebridge-blueair",
   "displayName": "Homebridge BlueAir",
-  "version": "1.2.0",
+  "version": "1.2.1-0",
   "description": "BlueAir plugin for Homebridge",
   "license": "Apache-2.0",
   "repository": "github:fjs21/homebridge-blueair",
