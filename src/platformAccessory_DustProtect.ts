@@ -47,7 +47,7 @@ export class BlueAirDustProtectAccessory {
     this.FilterMaintenance = this.accessory.getService(this.platform.Service.FilterMaintenance) ||
       this.accessory.addService(this.platform.Service.FilterMaintenance);
     if (!config.hideLED) {
-       this.Lightbulb = this.accessory.getService(this.platform.Service.Lightbulb) ||
+      this.Lightbulb = this.accessory.getService(this.platform.Service.Lightbulb) ||
          this.accessory.addService(this.platform.Service.Lightbulb);
     } else {
       this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Lightbulb);
@@ -57,7 +57,7 @@ export class BlueAirDustProtectAccessory {
         this.accessory.addService(this.platform.Service.Switch, 'Night Mode');
     } else {
       const existingNightModeSwitch = this.platform.getServiceUsingName(this.accessory, 'Night Mode');
-      if (existingNightModeSwitch != null) {
+      if (existingNightModeSwitch !== null) {
         this.platform.removeServiceIfExists(this.accessory, existingNightModeSwitch);
       } else {
         this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Switch);
@@ -175,7 +175,7 @@ export class BlueAirDustProtectAccessory {
           .onGet(this.handleGermShieldNameGet.bind(this));
       } else {
         const existingGermShieldSwitch = this.platform.getServiceUsingName(this.accessory, 'Germ Shield');
-        if (existingGermShieldSwitch != null) {
+        if (existingGermShieldSwitch !== null) {
           this.platform.removeServiceIfExists(this.accessory, existingGermShieldSwitch);
         } else {
           this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Switch);
@@ -523,9 +523,9 @@ export class BlueAirDustProtectAccessory {
     if(this.accessory.context.attributes.filterusage !== undefined) {
       let currentValue;
       if(this.accessory.context.attributes.filterusage < 95){
-        currentValue = this.platform.Characteristic.FilterChangeIndication.FILTER_OK;
+        currentValue = 0; //this.platform.Characteristic.FilterChangeIndication.FILTER_OK;
       } else {
-        currentValue = this.platform.Characteristic.FilterChangeIndication.CHANGE_FILTER;
+        currentValue = 1; //this.platform.Characteristic.FilterChangeIndication.CHANGE_FILTER;
       }
       this.FilterMaintenance.updateCharacteristic(this.platform.Characteristic.FilterChangeIndication, currentValue);
     } else {
@@ -554,12 +554,12 @@ export class BlueAirDustProtectAccessory {
       return true;
     }
 
-    // get LED state & brigtness
+    // get LED state & brightness
     if(this.accessory.context.attributes.brightness !== undefined) {
       if(this.accessory.context.attributes.brightness > 0) {
-        this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, 1);  
+        this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, true);
       } else {
-        this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, 0);  
+        this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, false);
       }
 
       this.Lightbulb.updateCharacteristic(this.platform.Characteristic.Brightness, this.accessory.context.attributes.brightness);
@@ -569,16 +569,16 @@ export class BlueAirDustProtectAccessory {
   async updateNightMode() {
     // Check to see if the air purifier is Off (Standby = True); If so, set LED to Off
     if(this.accessory.context.attributes.standby) {
-      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, 0);
+      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, false);
       return true;
     }
 
     // get NightMode Status
     if(this.accessory.context.attributes.nightmode !== undefined) {
       if(this.accessory.context.attributes.nightmode) {
-        this.NightMode.updateCharacteristic(this.platform.Characteristic.On, 1);
+        this.NightMode.updateCharacteristic(this.platform.Characteristic.On, true);
       } else {
-        this.NightMode.updateCharacteristic(this.platform.Characteristic.On, 0);
+        this.NightMode.updateCharacteristic(this.platform.Characteristic.On, false);
       }
     }
   }
@@ -586,16 +586,16 @@ export class BlueAirDustProtectAccessory {
   async updateGermShield() {
     // Check to see if the air purifier is Off (Standby = True); If so, set LED to Off
     if(this.accessory.context.attributes.standby) {
-      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, 0);
+      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, false);
       return true;
     }
 
     // get germShield Status
     if(this.accessory.context.attributes.germshield !== undefined) {
       if(this.accessory.context.attributes.germshield) {
-        this.GermShield.updateCharacteristic(this.platform.Characteristic.On, 1);
+        this.GermShield.updateCharacteristic(this.platform.Characteristic.On, true);
       } else {
-        this.GermShield.updateCharacteristic(this.platform.Characteristic.On, 0);
+        this.GermShield.updateCharacteristic(this.platform.Characteristic.On, false);
       }
     }
   }
@@ -669,7 +669,7 @@ export class BlueAirDustProtectAccessory {
     // Set NightMode
     if(state === false){ // Night Mode Off
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'nightmode', 'vb', false);
-      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, 0);
+      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, false);
     } else if (state === true){ // Night Mode On
       // If Air Purifier is turned off, first turn it on
       if(this.accessory.context.attributes.standby) {
@@ -677,7 +677,7 @@ export class BlueAirDustProtectAccessory {
         await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'standby', 'vb', false);
       }
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'nightmode', 'vb', true);
-      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, 1);
+      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, true);
     }
   }
 
@@ -687,7 +687,7 @@ export class BlueAirDustProtectAccessory {
     // Set GermShield
     if(state === false){ // Germ Shield Off
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'germshield', 'vb', false);
-      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, 0);
+      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, false);
     } else if (state === true){ // Night Mode On
       // If Air Purifier is turned off, first turn it on
       if(this.accessory.context.attributes.standby) {
@@ -695,7 +695,7 @@ export class BlueAirDustProtectAccessory {
         await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'standby', 'vb', false);
       }
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'germshield', 'vb', true);
-      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, 1);
+      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, true);
     }
   }
 
