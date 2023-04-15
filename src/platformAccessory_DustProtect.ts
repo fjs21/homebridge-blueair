@@ -374,9 +374,9 @@ export class BlueAirDustProtectAccessory {
     let currentValue: number = <number>this.AirPurifier.getCharacteristic(this.platform.Characteristic.Active).value;
     
     if(this.accessory.context.attributes.standby){
-      currentValue = this.platform.Characteristic.Active.INACTIVE;
+      currentValue = 0; //this.platform.Characteristic.Active.INACTIVE;
     } else if (!this.accessory.context.attributes.standby) {
-      currentValue = this.platform.Characteristic.Active.ACTIVE;
+      currentValue = 1; //this.platform.Characteristic.Active.ACTIVE;
     } else {
       this.platform.log.error('%s: failed to determine active state.', this.accessory.displayName);
       return false;
@@ -393,9 +393,9 @@ export class BlueAirDustProtectAccessory {
     let currentValue: number = <number>this.AirPurifier.getCharacteristic(this.platform.Characteristic.CurrentAirPurifierState).value;
     
     if(!this.accessory.context.attributes.standby){
-      currentValue = this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
+      currentValue = 2; //this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
     } else {
-      currentValue = this.platform.Characteristic.CurrentAirPurifierState.INACTIVE;
+      currentValue = 1; //this.platform.Characteristic.CurrentAirPurifierState.IDLE;
     }
 
     this.platform.log.debug('%s: CurrentState is %s', this.accessory.displayName, currentValue);
@@ -409,9 +409,9 @@ export class BlueAirDustProtectAccessory {
     let currentValue: number = <number>this.AirPurifier.getCharacteristic(this.platform.Characteristic.TargetAirPurifierState).value;
     
     if(this.accessory.context.attributes.automode){
-      currentValue = this.platform.Characteristic.TargetAirPurifierState.AUTO;
+      currentValue = 1; //this.platform.Characteristic.TargetAirPurifierState.AUTO;
     } else if (!this.accessory.context.attributes.automode){
-      currentValue = this.platform.Characteristic.TargetAirPurifierState.MANUAL;
+      currentValue = 0; //this.platform.Characteristic.TargetAirPurifierState.MANUAL;
     }
 
     this.platform.log.debug('%s: TargetState is %s', this.accessory.displayName, currentValue); 
@@ -425,9 +425,9 @@ export class BlueAirDustProtectAccessory {
     let currentValue: number = <number>this.AirPurifier.getCharacteristic(this.platform.Characteristic.LockPhysicalControls).value;
     
     if(this.accessory.context.attributes.childlock){
-      currentValue = this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_ENABLED;
+      currentValue = 1; //this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_ENABLED;
     } else {
-      currentValue = this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_DISABLED;
+      currentValue = 0; //this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_DISABLED;
     }
 
     this.platform.log.debug('%s: LockPhysicalControl is %s', this.accessory.displayName, currentValue); 
@@ -556,7 +556,7 @@ export class BlueAirDustProtectAccessory {
   async updateLED() {
     // Check to see if the air purifier is Off (Standby = True); If so, set LED to Off
     if(this.accessory.context.attributes.standby) {
-      this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, 0);
+      this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, false);
       return true;
     }
 
