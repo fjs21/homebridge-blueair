@@ -334,6 +334,8 @@ export class BlueAirHomebridgePlatform implements DynamicPlatformPlugin {
       case 'b4basic_m_1.1': // DustMagnet 5410
       case 'low_1.4': // HealthProtect 7440i, 7710i
       case 'high_1.5': // HealthProtect 7470i
+      case 'nb_h_1.0': // Blue Pure 211i Max
+      case 'nb_m_1.0': // Blue Pure 311i+ Max
         this.log.info('Creating new object: BlueAirDustProtectAccessory');
         new BlueAirDustProtectAccessory(this, accessory, this.config);
         break;
