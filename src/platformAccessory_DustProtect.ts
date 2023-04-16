@@ -38,6 +38,8 @@ export class BlueAirDustProtectAccessory {
     // initiate services
     this.AirPurifier = this.accessory.getService(this.platform.Service.AirPurifier) ||
       this.accessory.addService(this.platform.Service.AirPurifier);
+
+    this.platform.log.debug('hideAirQualitySensor is currently set to:', config.hideAirQualitySensor);
     if (!config.hideAirQualitySensor) {
       this.AirQualitySensor = this.accessory.getService(this.platform.Service.AirQualitySensor) ||
         this.accessory.addService(this.platform.Service.AirQualitySensor);
@@ -46,12 +48,16 @@ export class BlueAirDustProtectAccessory {
     }
     this.FilterMaintenance = this.accessory.getService(this.platform.Service.FilterMaintenance) ||
       this.accessory.addService(this.platform.Service.FilterMaintenance);
+
+    this.platform.log.debug('Hide LED is currently set to:', config.hideLED);
     if (!config.hideLED) {
       this.Lightbulb = this.accessory.getService(this.platform.Service.Lightbulb) ||
          this.accessory.addService(this.platform.Service.Lightbulb);
     } else {
       this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Lightbulb);
     }
+
+    this.platform.log.debug('hideNightMode is currently set to:', config.hideNightMode);
     if (!config.hideNightMode) {
       this.NightMode = this.accessory.getService('Night Mode') ||
         this.accessory.addService(this.platform.Service.Switch, 'Night Mode');
@@ -355,14 +361,26 @@ export class BlueAirDustProtectAccessory {
     await this.updateAirPurifierTargetAirPurifierState();
     await this.updateAirPurifierLockPhysicalControl();
     await this.updateAirPurifierRotationSpeed();
-    await this.updateAirQualitySensor();
     await this.updateFilterMaintenance();
-    await this.updateLED();
-    await this.updateNightMode();
+    if (!this.config.hideAirQualitySensor) {
+      await this.updateAirQualitySensor();
+    }
+    if (!this.config.hideLED) {
+      await this.updateLED();
+    }
+    if (!this.config.hideNightMode) {
+      await this.updateNightMode();
+    }
     if(this.accessory.context.configuration.di.hw === 'high_1.5') {
-      await this.updateGermShield();
-      await this.updateTempSensor();
-      await this.updateHumiditySensor();
+      if (!this.config.hideGermShield) {
+        await this.updateGermShield();
+      }
+      if (!this.config.hideTemperatureSensor) {
+        await this.updateTempSensor();
+      }
+      if (!this.config.hideHumiditySensor) {
+        await this.updateHumiditySensor();
+      }
     }
 
     return true;

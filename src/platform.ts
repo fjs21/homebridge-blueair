@@ -346,18 +346,30 @@ export class BlueAirHomebridgePlatform implements DynamicPlatformPlugin {
   }
 
   public removeServiceIfExists(accessory, service) {
+    this.log.debug('removeServiceIfExists accessory:', accessory);
+    this.log.debug('removeServiceIfExists service:', service);
     const foundService = accessory.getService(service);
+    this.log.debug('removeServiceIfExists foundServices:', foundService);
     if (foundService != null) {
-      this.log.warn(
+      this.log.info(
         'Removing stale Service: uuid:[%s]',
         foundService.UUID,
       );
 
       accessory.removeService(foundService);
+    } else if (service != null) {
+      this.log.info(
+        'Removing stale Service: uuid:[%s]',
+        service.UUID,
+      );
+
+      accessory.removeService(service);
     }
   }
 
   public getServiceUsingName(accessory, serviceName: string) {
+    this.log.debug('getServiceUsingName accessory:', accessory);
+    this.log.debug('getServiceUsingName serviceName:', serviceName);
     const foundService = accessory.getService(serviceName);
 
     return foundService;
