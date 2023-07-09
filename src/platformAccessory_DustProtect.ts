@@ -143,6 +143,9 @@ export class BlueAirDustProtectAccessory {
       case 'nb_m_1.0': // Blue Pure 311i+ Max
         this.modelName = 'Blue Pure 311i+ Max';
         break;
+      case 'nb_l_1.0': // Blue Pure 411i Max
+        this.modelName = 'Blue Pure 411i Max';
+        break;
       default:
         this.modelName = 'BlueAir Wi-Fi Enabled Purifier';
     }
