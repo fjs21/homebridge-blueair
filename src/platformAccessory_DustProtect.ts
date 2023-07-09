@@ -20,6 +20,9 @@ export class BlueAirDustProtectAccessory {
   // store last query to BlueAir API
   private lastquery;
   private modelName: string;
+  private hasTemperatureSensor = false;
+  private hasHumiditySensor = false;
+  private hasGermShield = false;
 
   // setup fake-gato history service for Eve support
   private historyService: fakegato.FakeGatoHistoryService;
@@ -136,6 +139,9 @@ export class BlueAirDustProtectAccessory {
       case 'low_1.4': // HealthProtect 7440i, 7710i
       case 'high_1.5': // HealthProtect 7470i
         this.modelName = 'HealthProtect';
+        this.hasTemperatureSensor = true;
+        this.hasHumiditySensor = true;
+        this.hasGermShield = true;
         break;
       case 'nb_h_1.0': // Blue Pure 211i Max
         this.modelName = 'Blue Pure 211i Max';
@@ -145,6 +151,8 @@ export class BlueAirDustProtectAccessory {
         break;
       case 'nb_l_1.0': // Blue Pure 411i Max
         this.modelName = 'Blue Pure 411i Max';
+        this.hasTemperatureSensor = true;
+        this.hasHumiditySensor = true;
         break;
       default:
         this.modelName = 'BlueAir Wi-Fi Enabled Purifier';
@@ -156,45 +164,43 @@ export class BlueAirDustProtectAccessory {
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.accessory.context.configuration.di.ds)
       .setCharacteristic(this.platform.Characteristic.FirmwareRevision, this.accessory.context.configuration.di.mfv);
 
-    // Only set up GermProtect, Tempature, and Humidity on HealthProtect models
-    if(this.modelName === 'HealthProtect') {
-      if (!this.config.hideTemperatureSensor) {
-        this.TemperatureSensor = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
-          this.accessory.addService(this.platform.Service.TemperatureSensor);
+    // Only set up Temperature for models that have a temp sensor
+    if (!this.config.hideTemperatureSensor && this.hasTemperatureSensor) {
+      this.TemperatureSensor = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
+        this.accessory.addService(this.platform.Service.TemperatureSensor);
 
-        this.TemperatureSensor.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
-          .onGet(this.handleTemperatureGet.bind(this));
+      this.TemperatureSensor.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
+        .onGet(this.handleTemperatureGet.bind(this));
+    } else {
+      this.platform.removeServiceIfExists(this.accessory, this.platform.Service.TemperatureSensor);
+    }
+    // Only set up Humidity on models that have a humidity sensor
+    if (!this.config.hideHumiditySensor && this.hasHumiditySensor) {
+      this.HumiditySensor = this.accessory.getService(this.platform.Service.HumiditySensor) ||
+        this.accessory.addService(this.platform.Service.HumiditySensor);
+
+      this.HumiditySensor.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+        .onGet(this.handleHumidityGet.bind(this));
+    } else {
+      this.platform.removeServiceIfExists(this.accessory, this.platform.Service.HumiditySensor);
+    }
+    // Only set up GermProtect on models that have Germ Shield
+    if (!this.config.hideGermShield && this.hasGermShield) {
+      this.GermShield = this.accessory.getService('Germ Shield') ||
+        this.accessory.addService(this.platform.Service.Switch, 'Germ Shield');
+
+      this.GermShield.getCharacteristic(this.platform.Characteristic.On)
+        .onGet(this.handleGermShieldGet.bind(this))
+        .onSet(this.handleGermShieldSet.bind(this));
+
+      this.GermShield.getCharacteristic(this.platform.Characteristic.Name)
+        .onGet(this.handleGermShieldNameGet.bind(this));
+    } else {
+      const existingGermShieldSwitch = this.platform.getServiceUsingName(this.accessory, 'Germ Shield');
+      if (existingGermShieldSwitch !== null) {
+        this.platform.removeServiceIfExists(this.accessory, existingGermShieldSwitch);
       } else {
-        this.platform.removeServiceIfExists(this.accessory, this.platform.Service.TemperatureSensor);
-      }
-
-      if (!this.config.hideHumiditySensor) {
-        this.HumiditySensor = this.accessory.getService(this.platform.Service.HumiditySensor) ||
-          this.accessory.addService(this.platform.Service.HumiditySensor);
-
-        this.HumiditySensor.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
-          .onGet(this.handleHumidityGet.bind(this));
-      } else {
-        this.platform.removeServiceIfExists(this.accessory, this.platform.Service.HumiditySensor);
-      }
-
-      if (!this.config.hideGermShield) {
-        this.GermShield = this.accessory.getService('Germ Shield') ||
-          this.accessory.addService(this.platform.Service.Switch, 'Germ Shield');
-
-        this.GermShield.getCharacteristic(this.platform.Characteristic.On)
-          .onGet(this.handleGermShieldGet.bind(this))
-          .onSet(this.handleGermShieldSet.bind(this));
-
-        this.GermShield.getCharacteristic(this.platform.Characteristic.Name)
-          .onGet(this.handleGermShieldNameGet.bind(this));
-      } else {
-        const existingGermShieldSwitch = this.platform.getServiceUsingName(this.accessory, 'Germ Shield');
-        if (existingGermShieldSwitch !== null) {
-          this.platform.removeServiceIfExists(this.accessory, existingGermShieldSwitch);
-        } else {
-          this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Switch);
-        }
+        this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Switch);
       }
     }
 
@@ -374,16 +380,14 @@ export class BlueAirDustProtectAccessory {
     if (!this.config.hideNightMode) {
       await this.updateNightMode();
     }
-    if(this.accessory.context.configuration.di.hw === 'high_1.5') {
-      if (!this.config.hideGermShield) {
-        await this.updateGermShield();
-      }
-      if (!this.config.hideTemperatureSensor) {
-        await this.updateTempSensor();
-      }
-      if (!this.config.hideHumiditySensor) {
-        await this.updateHumiditySensor();
-      }
+    if (!this.config.hideGermShield && this.hasGermShield) {
+      await this.updateGermShield();
+    }
+    if (!this.config.hideTemperatureSensor && this.hasTemperatureSensor) {
+      await this.updateTempSensor();
+    }
+    if (!this.config.hideHumiditySensor && this.hasHumiditySensor) {
+      await this.updateHumiditySensor();
     }
 
     return true;
