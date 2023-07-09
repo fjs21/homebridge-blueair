@@ -19,7 +19,7 @@
         },
         "enableAWS": {
             "title": "Enable AWS API connection",
-            "description": "This is required for devices like DustMagnet and HealthProtect.",
+            "description": "This is required for devices like DustMagnet, HealthProtect, and Blue Pure.",
             "type": "boolean",
             "required": false
         },
@@ -78,7 +78,7 @@
           "default": "us",
           "oneOf": [
             { "title": "US", "enum": ["us"] },
-            { "title": "EU", "enum": ["eu"] }
+            { "title": "Canada/EU", "enum": ["eu"] }
           ],
           "required": true
         },
