@@ -296,34 +296,37 @@ export class BlueAirHomebridgePlatform implements DynamicPlatformPlugin {
       case 'classic_290i':
       case 'classic_380i':
       case 'classic_480i':
+      case 'classic_490i':
       case 'classic_580i':
-      case 'classic_680i': 
-        new BlueAirPlatformAccessory(this, accessory);
+      case 'classic_680i':
+      case 'classic_690i':
+        new BlueAirPlatformAccessory(this, accessory, this.config);
         break;
 
       case 'aware': 
-        new BlueAirAwareAccessory(this, accessory);
+        new BlueAirAwareAccessory(this, accessory, this.config);
         break;
 
       case 'classic_205':
       case 'classic_405':
       case 'classic_505':
       case 'classic_605':
-        new BlueAirClassicAccessory(this, accessory);
+        new BlueAirClassicAccessory(this, accessory, this.config);
         break;
         
       case 'sense+':
-        new BlueAirClassicAccessory(this, accessory);
+        new BlueAirClassicAccessory(this, accessory, this.config);
         break;
       default:
         this.log.error('%s: device type not recognized, contact developer via GitHub.', device.name);
+        this.log.error('%s: compatibility type not recognized.', info.compatibility);
     }
 
   }
 
   // AWS Accessory currently handles DustMagnet and Health Protect
   private async findAwsModelAndInitialize(device, accessory){
-    // retreive model info
+    // retrieve model info
     const info = await this.blueairAws.getAwsDeviceInfo(device.name, device.uuid);
     this.log.debug('Device Info from findAwsModelAndInitialize: ', info);
     //this.log.info('%s of type "%s" initialized.', device.configuration.di.name, info.compatibility);
@@ -333,12 +336,45 @@ export class BlueAirHomebridgePlatform implements DynamicPlatformPlugin {
       case 'b4basic_m_1.1': // DustMagnet 5410
       case 'low_1.4': // HealthProtect 7440i, 7710i
       case 'high_1.5': // HealthProtect 7470i
+      case 'nb_h_1.0': // Blue Pure 211i Max
+      case 'nb_m_1.0': // Blue Pure 311i+ Max
+      case 'nb_l_1.0': // Blue Pure 411i Max
         this.log.info('Creating new object: BlueAirDustProtectAccessory');
-        new BlueAirDustProtectAccessory(this, accessory);
+        new BlueAirDustProtectAccessory(this, accessory, this.config);
         break;
       default:
         this.log.error('%s: device type not recognized, contact developer via GitHub.', device.name);
         this.log.error('This device is not yet supported. Device Type: ', info[0].configuration.di.hw);
     }
+  }
+
+  public removeServiceIfExists(accessory, service) {
+    this.log.debug('removeServiceIfExists accessory:', accessory);
+    this.log.debug('removeServiceIfExists service:', service);
+    const foundService = accessory.getService(service);
+    this.log.debug('removeServiceIfExists foundServices:', foundService);
+    if (foundService != null) {
+      this.log.info(
+        'Removing stale Service: uuid:[%s]',
+        foundService.UUID,
+      );
+
+      accessory.removeService(foundService);
+    } else if (service != null) {
+      this.log.info(
+        'Removing stale Service: uuid:[%s]',
+        service.UUID,
+      );
+
+      accessory.removeService(service);
+    }
+  }
+
+  public getServiceUsingName(accessory, serviceName: string) {
+    this.log.debug('getServiceUsingName accessory:', accessory);
+    this.log.debug('getServiceUsingName serviceName:', serviceName);
+    const foundService = accessory.getService(serviceName);
+
+    return foundService;
   }
 }

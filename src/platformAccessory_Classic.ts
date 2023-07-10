@@ -1,4 +1,4 @@
-import { Service, PlatformAccessory } from 'homebridge';
+import { Service, PlatformAccessory, PlatformConfig } from 'homebridge';
 
 import fakegato from 'fakegato-history';
 
@@ -10,7 +10,7 @@ export class BlueAirClassicAccessory {
   // setup device services
   private AirPurifier: Service;
   private FilterMaintenance: Service;
-  private Lightbulb: Service;
+  private Lightbulb!: Service;
 
   // store last query to BlueAir API
   private lastquery;
@@ -21,6 +21,7 @@ export class BlueAirClassicAccessory {
   constructor(
     private readonly platform: BlueAirHomebridgePlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly config: PlatformConfig,
   ) {
 
     // set model name, firware, etc.
@@ -31,8 +32,12 @@ export class BlueAirClassicAccessory {
       this.accessory.addService(this.platform.Service.AirPurifier);
     this.FilterMaintenance = this.accessory.getService(this.platform.Service.FilterMaintenance) ||
       this.accessory.addService(this.platform.Service.FilterMaintenance);
-    this.Lightbulb = this.accessory.getService(this.platform.Service.Lightbulb) || 
-      this.accessory.addService(this.platform.Service.Lightbulb);
+    if (!config.hideLED) {
+      this.Lightbulb = this.accessory.getService(this.platform.Service.Lightbulb) ||
+        this.accessory.addService(this.platform.Service.Lightbulb);
+    } else {
+      this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Lightbulb);
+    }
     
     // create handlers for characteristics
     this.AirPurifier.getCharacteristic(this.platform.Characteristic.Active)
@@ -60,13 +65,15 @@ export class BlueAirClassicAccessory {
     this.FilterMaintenance.getCharacteristic(this.platform.Characteristic.FilterLifeLevel)
       .onGet(this.handleFilterLifeLevelGet.bind(this));
 
-    this.Lightbulb.getCharacteristic(this.platform.Characteristic.On)
-      .onGet(this.handleOnGet.bind(this))
-      .onSet(this.handleOnSet.bind(this));
+    if (!config.hideLED) {
+      this.Lightbulb.getCharacteristic(this.platform.Characteristic.On)
+        .onGet(this.handleOnGet.bind(this))
+        .onSet(this.handleOnSet.bind(this));
 
-    this.Lightbulb.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onGet(this.handleBrightnessGet.bind(this))
-      .onSet(this.handleBrightnessSet.bind(this));
+      this.Lightbulb.getCharacteristic(this.platform.Characteristic.Brightness)
+        .onGet(this.handleBrightnessGet.bind(this))
+        .onSet(this.handleBrightnessSet.bind(this));
+    }
 
   }
 

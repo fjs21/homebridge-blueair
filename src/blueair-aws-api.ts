@@ -17,16 +17,13 @@ export class BlueAirAwsApi {
   private region: string;
 
   private lastAuthenticateCall!: number;
-  //private base_API_url: string;
-  //private homehost!: string;
-  //private authToken!: string;
 
   // AWS URL Regions
   private gigyaRegion!: string;
   private awsRegion!: string;
 
   // AWS Keys
-  private awsKeys: object;
+  private readonly awsKeys;
   private awsApiKey!: string;
   private awsRestApiId!: string;
 
@@ -247,7 +244,7 @@ export class BlueAirAwsApi {
     // Check if the tokenExpiration is older than the current date.
     const now = Date.now();
     const expirationDate = new Date(this.tokenExpiration);
-    this.log.info('Checking token expiration date/time. Current token(s) expire at: %s', expirationDate.toString());
+    this.log.debug('Checking token expiration date/time. Current token(s) expire at: %s', expirationDate.toString());
 
     if(this.tokenExpiration < now) {
       const refreshTokens = await this.refreshAwsTokens();

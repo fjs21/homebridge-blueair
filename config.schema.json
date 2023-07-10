@@ -18,17 +18,67 @@
             "required": true
         },
         "enableAWS": {
-            "title": "Enable AWS API connection (required for devices like DustMagnet and HealthProtect)",
+            "title": "Enable AWS API connection",
+            "description": "This is required for devices like DustMagnet, HealthProtect, and Blue Pure.",
             "type": "boolean",
             "required": false
         },
-        "region": {
+        "hideLED": {
+          "title": "Hide LED",
+          "description": "When enabled, this will hide any LED sensor and prevent it from appearing in Homebridge or in the Home.app as a light bulb.",
+          "type": "boolean",
+          "default": false,
+          "required": false
+        },
+        "hideAirQualitySensor": {
+          "title": "Hide Air Quality Sensor",
+          "description": "When enabled, this will hide any Air Quality sensor and prevent it from appearing in Homebridge or in the Home.app.",
+          "type": "boolean",
+          "default": false,
+          "required": false
+        },
+        "hideCO2Sensor": {
+          "title": "Hide CO2 Sensor",
+          "description": "When enabled, this will hide any CO2 sensor and prevent it from appearing in Homebridge or in the Home.app.",
+          "type": "boolean",
+          "default": false,
+          "required": false
+        },
+        "hideTemperatureSensor": {
+          "title": "Hide Temperature Sensor",
+          "description": "When enabled, this will hide any Temperature sensor and prevent it from appearing in Homebridge or in the Home.app.",
+          "type": "boolean",
+          "default": false,
+          "required": false
+        },
+        "hideHumiditySensor": {
+          "title": "Hide Humidity Sensor",
+          "description": "When enabled, this will hide any Humidity sensor and prevent it from appearing in Homebridge or in the Home.app.",
+          "type": "boolean",
+          "default": false,
+          "required": false
+        },
+        "hideGermShield": {
+          "title": "Hide Germ Shield",
+          "description": "When enabled, this will hide all GermShield controls and prevent them from appearing in Homebridge or in the Home.app as a switch.",
+          "type": "boolean",
+          "default": false,
+          "required": false
+        },
+        "hideNightMode": {
+          "title": "Hide Night Mode",
+          "description": "When enabled, this will hide all Night Mode controls and prevent them from appearing in Homebridge or in the Home.app as a switch.",
+          "type": "boolean",
+          "default": false,
+          "required": false
+        },
+      "region": {
           "title": "Region",
           "type": "string",
           "default": "us",
           "oneOf": [
             { "title": "US", "enum": ["us"] },
-            { "title": "EU", "enum": ["eu"] }
+            { "title": "Canada/EU", "enum": ["eu"] }
           ],
           "required": true
         },

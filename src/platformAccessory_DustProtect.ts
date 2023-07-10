@@ -1,4 +1,4 @@
-import { Service, PlatformAccessory } from 'homebridge';
+import {Service, PlatformAccessory, PlatformConfig } from 'homebridge';
 
 import fakegato from 'fakegato-history';
 
@@ -9,14 +9,20 @@ import { BLUEAIR_DEVICE_WAIT } from './settings';
 export class BlueAirDustProtectAccessory {
   // setup device services
   private AirPurifier: Service;
-  private AirQualitySensor: Service;
+  private AirQualitySensor!: Service;
+  private TemperatureSensor!: Service;
+  private HumiditySensor!: Service;
   private FilterMaintenance: Service;
-  private Lightbulb: Service;
-  private NightMode: Service;
-  private GermShield: Service;
+  private Lightbulb!: Service;
+  private NightMode!: Service;
+  private GermShield!: Service;
 
   // store last query to BlueAir API
   private lastquery;
+  private modelName: string;
+  private hasTemperatureSensor = false;
+  private hasHumiditySensor = false;
+  private hasGermShield = false;
 
   // setup fake-gato history service for Eve support
   private historyService: fakegato.FakeGatoHistoryService;
@@ -24,6 +30,7 @@ export class BlueAirDustProtectAccessory {
   constructor(
     private readonly platform: BlueAirHomebridgePlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly config: PlatformConfig,
   ) {
 
     // set model name, firware, etc.
@@ -34,16 +41,39 @@ export class BlueAirDustProtectAccessory {
     // initiate services
     this.AirPurifier = this.accessory.getService(this.platform.Service.AirPurifier) ||
       this.accessory.addService(this.platform.Service.AirPurifier);
-    this.AirQualitySensor = this.accessory.getService(this.platform.Service.AirQualitySensor) ||
-      this.accessory.addService(this.platform.Service.AirQualitySensor);
+
+    this.platform.log.debug('hideAirQualitySensor is currently set to:', config.hideAirQualitySensor);
+    if (!config.hideAirQualitySensor) {
+      this.AirQualitySensor = this.accessory.getService(this.platform.Service.AirQualitySensor) ||
+        this.accessory.addService(this.platform.Service.AirQualitySensor);
+    } else {
+      this.platform.removeServiceIfExists(this.accessory, this.platform.Service.AirQualitySensor);
+    }
     this.FilterMaintenance = this.accessory.getService(this.platform.Service.FilterMaintenance) ||
       this.accessory.addService(this.platform.Service.FilterMaintenance);
-    this.Lightbulb = this.accessory.getService(this.platform.Service.Lightbulb) ||
-      this.accessory.addService(this.platform.Service.Lightbulb);
-    this.NightMode = this.accessory.getService(this.platform.Service.Switch) ||
-      this.accessory.addService(this.platform.Service.Switch);
-    this.GermShield = this.accessory.getService(this.platform.Service.Switch) ||
-      this.accessory.addService(this.platform.Service.Switch);
+
+    this.platform.log.debug('Hide LED is currently set to:', config.hideLED);
+    if (!config.hideLED) {
+      this.Lightbulb = this.accessory.getService(this.platform.Service.Lightbulb) ||
+         this.accessory.addService(this.platform.Service.Lightbulb);
+    } else {
+      this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Lightbulb);
+    }
+
+    this.platform.log.debug('hideNightMode is currently set to:', config.hideNightMode);
+    if (!config.hideNightMode) {
+      this.NightMode = this.accessory.getService('Night Mode') ||
+        this.accessory.addService(this.platform.Service.Switch, 'Night Mode');
+    } else {
+      const existingNightModeSwitch = this.platform.getServiceUsingName(this.accessory, 'Night Mode');
+      if (existingNightModeSwitch !== null) {
+        this.platform.removeServiceIfExists(this.accessory, existingNightModeSwitch);
+      } else {
+        this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Switch);
+      }
+    }
+
+    this.modelName = 'BlueAir Wi-Fi Enabled Purifier';
 
     // create handlers for characteristics
     this.AirPurifier.getCharacteristic(this.platform.Characteristic.Active)
@@ -65,8 +95,10 @@ export class BlueAirDustProtectAccessory {
       .onGet(this.handleRotationSpeedGet.bind(this))
       .onSet(this.handleRotationSpeedSet.bind(this));
 
-    this.AirQualitySensor.getCharacteristic(this.platform.Characteristic.PM2_5Density)
-      .onGet(this.handlePM25DensityGet.bind(this));
+    if (!config.hideAirQualitySensor) {
+      this.AirQualitySensor.getCharacteristic(this.platform.Characteristic.PM2_5Density)
+        .onGet(this.handlePM25DensityGet.bind(this));
+    }
 
     this.FilterMaintenance.getCharacteristic(this.platform.Characteristic.FilterChangeIndication)
       .onGet(this.handleFilterChangeGet.bind(this));
@@ -74,20 +106,23 @@ export class BlueAirDustProtectAccessory {
     this.FilterMaintenance.getCharacteristic(this.platform.Characteristic.FilterLifeLevel)
       .onGet(this.handleFilterLifeLevelGet.bind(this));
 
-    this.Lightbulb.getCharacteristic(this.platform.Characteristic.On)
-      .onGet(this.handleOnGet.bind(this))
-      .onSet(this.handleOnSet.bind(this));
+    if (!config.hideLED) {
+      this.Lightbulb.getCharacteristic(this.platform.Characteristic.On)
+        .onGet(this.handleOnGet.bind(this))
+        .onSet(this.handleOnSet.bind(this));
 
-    this.Lightbulb.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onGet(this.handleBrightnessGet.bind(this))
-      .onSet(this.handleBrightnessSet.bind(this));
+      this.Lightbulb.getCharacteristic(this.platform.Characteristic.Brightness)
+        .onGet(this.handleBrightnessGet.bind(this))
+        .onSet(this.handleBrightnessSet.bind(this));
+    }
 
-    this.NightMode.getCharacteristic(this.platform.Characteristic.On)
-      .onGet(this.handleNightModeGet.bind(this))
-      .onSet(this.handleNightModeSet.bind(this));
-
-    this.NightMode.getCharacteristic(this.platform.Characteristic.Name)
-      .onGet(this.handleNightModeNameGet.bind(this));
+    if (!config.hideNightMode) {
+      this.NightMode.getCharacteristic(this.platform.Characteristic.On)
+        .onGet(this.handleNightModeGet.bind(this))
+        .onSet(this.handleNightModeSet.bind(this));
+      this.NightMode.getCharacteristic(this.platform.Characteristic.Name)
+        .onGet(this.handleNightModeNameGet.bind(this));
+    }
 
   }
 
@@ -96,20 +131,75 @@ export class BlueAirDustProtectAccessory {
 
     await this.updateDevice();
 
+    switch (this.accessory.context.configuration.di.hw) {
+      case 'b4basic_s_1.1': // DustMagnet 5210
+      case 'b4basic_m_1.1': // DustMagnet 5410
+        this.modelName = 'DustMagnet';
+        break;
+      case 'low_1.4': // HealthProtect 7440i, 7710i
+      case 'high_1.5': // HealthProtect 7470i
+        this.modelName = 'HealthProtect';
+        this.hasTemperatureSensor = true;
+        this.hasHumiditySensor = true;
+        this.hasGermShield = true;
+        break;
+      case 'nb_h_1.0': // Blue Pure 211i Max
+        this.modelName = 'Blue Pure 211i Max';
+        break;
+      case 'nb_m_1.0': // Blue Pure 311i+ Max
+        this.modelName = 'Blue Pure 311i+ Max';
+        break;
+      case 'nb_l_1.0': // Blue Pure 411i Max
+        this.modelName = 'Blue Pure 411i Max';
+        break;
+      default:
+        this.modelName = 'BlueAir Wi-Fi Enabled Purifier';
+    }
+
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'BlueAir')
-      .setCharacteristic(this.platform.Characteristic.Model, 'DustProtect')
+      .setCharacteristic(this.platform.Characteristic.Model, this.modelName)
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.accessory.context.configuration.di.ds)
       .setCharacteristic(this.platform.Characteristic.FirmwareRevision, this.accessory.context.configuration.di.mfv);
 
-    // Only set up GermProtect on HealthProtect models
-    if(this.accessory.context.configuration.di.hw === 'high_1.5') {
+    // Only set up Temperature for models that have a temp sensor
+    if (!this.config.hideTemperatureSensor && this.hasTemperatureSensor) {
+      this.TemperatureSensor = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
+        this.accessory.addService(this.platform.Service.TemperatureSensor);
+
+      this.TemperatureSensor.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
+        .onGet(this.handleTemperatureGet.bind(this));
+    } else {
+      this.platform.removeServiceIfExists(this.accessory, this.platform.Service.TemperatureSensor);
+    }
+    // Only set up Humidity on models that have a humidity sensor
+    if (!this.config.hideHumiditySensor && this.hasHumiditySensor) {
+      this.HumiditySensor = this.accessory.getService(this.platform.Service.HumiditySensor) ||
+        this.accessory.addService(this.platform.Service.HumiditySensor);
+
+      this.HumiditySensor.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+        .onGet(this.handleHumidityGet.bind(this));
+    } else {
+      this.platform.removeServiceIfExists(this.accessory, this.platform.Service.HumiditySensor);
+    }
+    // Only set up GermProtect on models that have Germ Shield
+    if (!this.config.hideGermShield && this.hasGermShield) {
+      this.GermShield = this.accessory.getService('Germ Shield') ||
+        this.accessory.addService(this.platform.Service.Switch, 'Germ Shield');
+
       this.GermShield.getCharacteristic(this.platform.Characteristic.On)
         .onGet(this.handleGermShieldGet.bind(this))
         .onSet(this.handleGermShieldSet.bind(this));
 
       this.GermShield.getCharacteristic(this.platform.Characteristic.Name)
         .onGet(this.handleGermShieldNameGet.bind(this));
+    } else {
+      const existingGermShieldSwitch = this.platform.getServiceUsingName(this.accessory, 'Germ Shield');
+      if (existingGermShieldSwitch !== null) {
+        this.platform.removeServiceIfExists(this.accessory, existingGermShieldSwitch);
+      } else {
+        this.platform.removeServiceIfExists(this.accessory, this.platform.Service.Switch);
+      }
     }
 
   }
@@ -213,6 +303,16 @@ export class BlueAirDustProtectAccessory {
     return this.AirQualitySensor.getCharacteristic(this.platform.Characteristic.PM2_5Density).value;
   }
 
+  async handleTemperatureGet() {
+    await this.updateAccessoryCharacteristics();
+    return this.TemperatureSensor.getCharacteristic(this.platform.Characteristic.CurrentTemperature).value;
+  }
+
+  async handleHumidityGet() {
+    await this.updateAccessoryCharacteristics();
+    return this.HumiditySensor.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity).value;
+  }
+
   async handleFilterChangeGet() {
     await this.updateAccessoryCharacteristics();
     return this.FilterMaintenance.getCharacteristic(this.platform.Characteristic.FilterChangeIndication).value;
@@ -268,12 +368,24 @@ export class BlueAirDustProtectAccessory {
     await this.updateAirPurifierTargetAirPurifierState();
     await this.updateAirPurifierLockPhysicalControl();
     await this.updateAirPurifierRotationSpeed();
-    await this.updateAirQualitySensor();
     await this.updateFilterMaintenance();
-    await this.updateLED();
-    await this.updateNightMode();
-    if(this.accessory.context.configuration.di.hw === 'high_1.5') {
+    if (!this.config.hideAirQualitySensor) {
+      await this.updateAirQualitySensor();
+    }
+    if (!this.config.hideLED) {
+      await this.updateLED();
+    }
+    if (!this.config.hideNightMode) {
+      await this.updateNightMode();
+    }
+    if (!this.config.hideGermShield && this.hasGermShield) {
       await this.updateGermShield();
+    }
+    if (!this.config.hideTemperatureSensor && this.hasTemperatureSensor) {
+      await this.updateTempSensor();
+    }
+    if (!this.config.hideHumiditySensor && this.hasHumiditySensor) {
+      await this.updateHumiditySensor();
     }
 
     return true;
@@ -285,9 +397,9 @@ export class BlueAirDustProtectAccessory {
     let currentValue: number = <number>this.AirPurifier.getCharacteristic(this.platform.Characteristic.Active).value;
     
     if(this.accessory.context.attributes.standby){
-      currentValue = this.platform.Characteristic.Active.INACTIVE;
+      currentValue = 0; //this.platform.Characteristic.Active.INACTIVE;
     } else if (!this.accessory.context.attributes.standby) {
-      currentValue = this.platform.Characteristic.Active.ACTIVE;
+      currentValue = 1; //this.platform.Characteristic.Active.ACTIVE;
     } else {
       this.platform.log.error('%s: failed to determine active state.', this.accessory.displayName);
       return false;
@@ -304,9 +416,9 @@ export class BlueAirDustProtectAccessory {
     let currentValue: number = <number>this.AirPurifier.getCharacteristic(this.platform.Characteristic.CurrentAirPurifierState).value;
     
     if(!this.accessory.context.attributes.standby){
-      currentValue = this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
+      currentValue = 2; //this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
     } else {
-      currentValue = this.platform.Characteristic.CurrentAirPurifierState.INACTIVE;
+      currentValue = 1; //this.platform.Characteristic.CurrentAirPurifierState.IDLE;
     }
 
     this.platform.log.debug('%s: CurrentState is %s', this.accessory.displayName, currentValue);
@@ -320,9 +432,9 @@ export class BlueAirDustProtectAccessory {
     let currentValue: number = <number>this.AirPurifier.getCharacteristic(this.platform.Characteristic.TargetAirPurifierState).value;
     
     if(this.accessory.context.attributes.automode){
-      currentValue = this.platform.Characteristic.TargetAirPurifierState.AUTO;
+      currentValue = 1; //this.platform.Characteristic.TargetAirPurifierState.AUTO;
     } else if (!this.accessory.context.attributes.automode){
-      currentValue = this.platform.Characteristic.TargetAirPurifierState.MANUAL;
+      currentValue = 0; //this.platform.Characteristic.TargetAirPurifierState.MANUAL;
     }
 
     this.platform.log.debug('%s: TargetState is %s', this.accessory.displayName, currentValue); 
@@ -336,9 +448,9 @@ export class BlueAirDustProtectAccessory {
     let currentValue: number = <number>this.AirPurifier.getCharacteristic(this.platform.Characteristic.LockPhysicalControls).value;
     
     if(this.accessory.context.attributes.childlock){
-      currentValue = this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_ENABLED;
+      currentValue = 1; //this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_ENABLED;
     } else {
-      currentValue = this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_DISABLED;
+      currentValue = 0; //this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_DISABLED;
     }
 
     this.platform.log.debug('%s: LockPhysicalControl is %s', this.accessory.displayName, currentValue); 
@@ -365,6 +477,38 @@ export class BlueAirDustProtectAccessory {
     return true;
   }
 
+  async updateTempSensor() {
+    // Update Temperature measurements
+    if(this.accessory.context.sensorData !== undefined) {
+      this.platform.log.debug('Sensor Data: ', this.accessory.context.sensorData);
+      let currentValue = 0;
+      // Characteristic triggers warning if value below -270 and over 100; measured in Celcius
+      if(this.accessory.context.sensorData.t !== undefined){
+        currentValue = this.accessory.context.sensorData.t;
+        this.TemperatureSensor.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, currentValue);
+        this.platform.log.debug('Temperature: ', currentValue);
+      }
+
+      this.TemperatureSensor.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, currentValue);
+    }
+  }
+
+  async updateHumiditySensor() {
+    // Update Temperature measurements
+    if(this.accessory.context.sensorData !== undefined) {
+      this.platform.log.debug('Sensor Data: ', this.accessory.context.sensorData);
+      let currentValue = 0;
+      // Characteristic triggers warning if value below 0 and over 100
+      if(this.accessory.context.sensorData.h !== undefined){
+        currentValue = this.accessory.context.sensorData.h;
+        this.HumiditySensor.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, currentValue);
+        this.platform.log.debug('Humidity: ', currentValue);
+      }
+
+      this.HumiditySensor.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, currentValue);
+    }
+  }
+
   async updateAirQualitySensor() {
     // Update AirQuality measurements
     if(this.accessory.context.sensorData !== undefined) {
@@ -374,14 +518,18 @@ export class BlueAirDustProtectAccessory {
         this.AirQualitySensor.updateCharacteristic(this.platform.Characteristic.PM2_5Density, this.accessory.context.sensorData.pm2_5);
         this.platform.log.debug('Sensor Data - PM 2.5: ', this.accessory.context.sensorData.pm2_5);
       }
+      if(this.accessory.context.sensorData.tVOC !== undefined){
+        this.AirQualitySensor.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.accessory.context.sensorData.tVOC);
+        this.platform.log.debug('Sensor Data - tVOC: ', this.accessory.context.sensorData.tVOC);
+      }
 
-      // Used 2.5 levels from https://www.epa.gov/sites/default/files/2014-05/documents/zell-aqi.pdf
+      // Used 2.5 levels from Blueair https://p13.zdusercontent.com/attachment/10296796/yAiDFUVJ8TVKKSClbLiWCoLfe?token=eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..fI7-AsJ9SUhyJZpY-j3bxw.JwSbAcnZEAy81sYvOgYzbcA5mFkd0u1QDU9KWIqh0S5Gk2D4vpZe0JmzS3wwKd_XGr4XArmyuoNaZ1fL-Xjjw1BolnIE6PY4CNtnxnsEbccyRY0lxyeBJ-z2cdV8-vwp0pBc9f6f3aPT17JTQt8R2T5keuxlEUaz3XTJ45ALBN1q8D1H-YJtN8OuYGinu3Malw63x0pwmI012Xl1JBmGERiica_qeppfjACQffbM7E_GRPDSgwAzaufFqSwweSsN45q8G4kaiT9kS4pMl1xEbX5evxPh80A16PWBznnn95w.VeF3HbNP8fC3ORGQh47Nzw
       const levels = [
-        [99999, 150.5, 5], // 5 = this.platform.Characteristic.AirQuality.POOR
-        [150.4, 65.5, 4], // 4 = this.platform.Characteristic.AirQuality.INFERIOR
-        [65.4, 40.5, 3], //  3 = this.platform.Characteristic.AirQuality.FAIR
-        [40.4, 15.5, 2], // 2 = this.platform.Characteristic.AirQuality.GOOD
-        [15.4, 0, 1], // 1 = this.platform.Characteristic.AirQuality.EXCELLENT
+        [99999, 50.1, 5], // 5 = this.platform.Characteristic.AirQuality.POOR
+        [50, 35.1, 4], // 4 = this.platform.Characteristic.AirQuality.INFERIOR
+        [35, 25.1, 3], //  3 = this.platform.Characteristic.AirQuality.FAIR
+        [25, 10.1, 2], // 2 = this.platform.Characteristic.AirQuality.GOOD
+        [10, 0, 1], // 1 = this.platform.Characteristic.AirQuality.EXCELLENT
       ];
 
       const ppm = this.accessory.context.sensorData.pm2_5;
@@ -404,9 +552,9 @@ export class BlueAirDustProtectAccessory {
     if(this.accessory.context.attributes.filterusage !== undefined) {
       let currentValue;
       if(this.accessory.context.attributes.filterusage < 95){
-        currentValue = this.platform.Characteristic.FilterChangeIndication.FILTER_OK;
+        currentValue = 0; //this.platform.Characteristic.FilterChangeIndication.FILTER_OK;
       } else {
-        currentValue = this.platform.Characteristic.FilterChangeIndication.CHANGE_FILTER;
+        currentValue = 1; //this.platform.Characteristic.FilterChangeIndication.CHANGE_FILTER;
       }
       this.FilterMaintenance.updateCharacteristic(this.platform.Characteristic.FilterChangeIndication, currentValue);
     } else {
@@ -431,16 +579,16 @@ export class BlueAirDustProtectAccessory {
   async updateLED() {
     // Check to see if the air purifier is Off (Standby = True); If so, set LED to Off
     if(this.accessory.context.attributes.standby) {
-      this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, 0);
+      this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, false);
       return true;
     }
 
-    // get LED state & brigtness
+    // get LED state & brightness
     if(this.accessory.context.attributes.brightness !== undefined) {
       if(this.accessory.context.attributes.brightness > 0) {
-        this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, 1);  
+        this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, true);
       } else {
-        this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, 0);  
+        this.Lightbulb.updateCharacteristic(this.platform.Characteristic.On, false);
       }
 
       this.Lightbulb.updateCharacteristic(this.platform.Characteristic.Brightness, this.accessory.context.attributes.brightness);
@@ -450,16 +598,16 @@ export class BlueAirDustProtectAccessory {
   async updateNightMode() {
     // Check to see if the air purifier is Off (Standby = True); If so, set LED to Off
     if(this.accessory.context.attributes.standby) {
-      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, 0);
+      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, false);
       return true;
     }
 
     // get NightMode Status
     if(this.accessory.context.attributes.nightmode !== undefined) {
       if(this.accessory.context.attributes.nightmode) {
-        this.NightMode.updateCharacteristic(this.platform.Characteristic.On, 1);
+        this.NightMode.updateCharacteristic(this.platform.Characteristic.On, true);
       } else {
-        this.NightMode.updateCharacteristic(this.platform.Characteristic.On, 0);
+        this.NightMode.updateCharacteristic(this.platform.Characteristic.On, false);
       }
     }
   }
@@ -467,16 +615,16 @@ export class BlueAirDustProtectAccessory {
   async updateGermShield() {
     // Check to see if the air purifier is Off (Standby = True); If so, set LED to Off
     if(this.accessory.context.attributes.standby) {
-      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, 0);
+      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, false);
       return true;
     }
 
-    // get NightMode Status
+    // get germShield Status
     if(this.accessory.context.attributes.germshield !== undefined) {
       if(this.accessory.context.attributes.germshield) {
-        this.GermShield.updateCharacteristic(this.platform.Characteristic.On, 1);
+        this.GermShield.updateCharacteristic(this.platform.Characteristic.On, true);
       } else {
-        this.GermShield.updateCharacteristic(this.platform.Characteristic.On, 0);
+        this.GermShield.updateCharacteristic(this.platform.Characteristic.On, false);
       }
     }
   }
@@ -492,6 +640,7 @@ export class BlueAirDustProtectAccessory {
       // Set fan speed to 0 when turned off
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'standby', 'vb', true);
     }
+    this.AirPurifier.updateCharacteristic(this.platform.Characteristic.Active, state);
   }
 
   async handleTargetAirPurifierSet(state) {
@@ -501,21 +650,28 @@ export class BlueAirDustProtectAccessory {
     } else if (state === 1){ // Auto
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'automode', 'vb', true);
     }
+    this.AirPurifier.updateCharacteristic(this.platform.Characteristic.TargetAirPurifierState, state);
   }
 
   async handleLockPhysicalControlsSet(state) {
     // Set child lock state
-
     if(state === 0){ // Child Lock Unlocked
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'childlock', 'vb', false);
     } else if (state === 1){ // Child Lock Locked
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'childlock', 'vb', true);
     }
+    this.AirPurifier.updateCharacteristic(this.platform.Characteristic.LockPhysicalControls, state);
   }
 
   async handleRotationSpeedSet(value) {
-    // Set fan rotation speed  
+    // Set fan rotation speed
     await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'fanspeed', 'v', value);
+    this.AirPurifier.updateCharacteristic(this.platform.Characteristic.RotationSpeed, value);
+
+    if(this.accessory.context.attributes.automode) {
+      this.accessory.context.attributes.automode = false;
+      await this.updateAirPurifierTargetAirPurifierState();
+    }
   }
 
   async handleOnSet(state) {
@@ -542,6 +698,7 @@ export class BlueAirDustProtectAccessory {
     // Set NightMode
     if(state === false){ // Night Mode Off
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'nightmode', 'vb', false);
+      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, false);
     } else if (state === true){ // Night Mode On
       // If Air Purifier is turned off, first turn it on
       if(this.accessory.context.attributes.standby) {
@@ -549,6 +706,7 @@ export class BlueAirDustProtectAccessory {
         await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'standby', 'vb', false);
       }
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'nightmode', 'vb', true);
+      this.NightMode.updateCharacteristic(this.platform.Characteristic.On, true);
     }
   }
 
@@ -558,6 +716,7 @@ export class BlueAirDustProtectAccessory {
     // Set GermShield
     if(state === false){ // Germ Shield Off
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'germshield', 'vb', false);
+      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, false);
     } else if (state === true){ // Night Mode On
       // If Air Purifier is turned off, first turn it on
       if(this.accessory.context.attributes.standby) {
@@ -565,6 +724,7 @@ export class BlueAirDustProtectAccessory {
         await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'standby', 'vb', false);
       }
       await this.platform.blueairAws.setAwsDeviceInfo(this.accessory.context.uuid, 'germshield', 'vb', true);
+      this.GermShield.updateCharacteristic(this.platform.Characteristic.On, true);
     }
   }
 
