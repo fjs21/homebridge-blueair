@@ -151,8 +151,6 @@ export class BlueAirDustProtectAccessory {
         break;
       case 'nb_l_1.0': // Blue Pure 411i Max
         this.modelName = 'Blue Pure 411i Max';
-        this.hasTemperatureSensor = true;
-        this.hasHumiditySensor = true;
         break;
       default:
         this.modelName = 'BlueAir Wi-Fi Enabled Purifier';
